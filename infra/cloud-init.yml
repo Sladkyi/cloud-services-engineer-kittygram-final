@@ -1,0 +1,43 @@
+#cloud-config
+users:
+  - name: ${vm_user}
+    groups: sudo, docker
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+
+write_files:
+  - path: /home/${vm_user}/kittygram/.env
+    owner: ${vm_user}:${vm_user}
+    permissions: '0640'
+    defer: true
+    content: |
+      POSTGRES_DB=kittygram
+      POSTGRES_USER=kittygram_user
+      POSTGRES_PASSWORD=kittygram_password
+      DB_HOST=db
+      DB_PORT=5432
+      SECRET_KEY=django-insecure-${vm_name}
+      DEBUG=False
+      ALLOWED_HOSTS=*
+
+runcmd:
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+  - usermod -aG docker ${vm_user}
+  - mkdir -p /home/${vm_user}/kittygram
+  - chown -R ${vm_user}:${vm_user} /home/${vm_user}/kittygram
