@@ -28,10 +28,6 @@ resource "yandex_compute_instance" "kittygram_vm" {
     security_group_ids = [yandex_vpc_security_group.kittygram_sg.id]
   }
 
-  scheduling_policy {
-    preemptible = true
-  }
-
   metadata = {
     user-data = templatefile("${path.module}/cloud-init.yml", {
       vm_user        = var.vm_user
