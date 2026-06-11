@@ -30,6 +30,26 @@ write_files:
       DEBUG=False
       ALLOWED_HOSTS=*
 
+  - path: /usr/local/bin/kittygram-healthcheck.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      COMPOSE_FILE="/home/${vm_user}/kittygram/docker-compose.production.yml"
+      if [ ! -f "$COMPOSE_FILE" ]; then
+        exit 0
+      fi
+      if ! curl -fsS --max-time 10 http://127.0.0.1:9000/ >/dev/null; then
+        cd /home/${vm_user}/kittygram
+        docker compose -f docker-compose.production.yml up -d --remove-orphans
+      fi
+
+  - path: /etc/cron.d/kittygram-maintenance
+    permissions: '0644'
+    content: |
+      0 3 * * 0 root docker system prune -af --filter "until=168h"
+      */5 * * * * root /usr/local/bin/kittygram-healthcheck.sh
+
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -37,6 +57,25 @@ runcmd:
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
   - apt-get update -y
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - |
+    if [ ! -f /swapfile ]; then
+      fallocate -l 2G /swapfile
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+  - |
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json <<'EOF'
+    {
+      "log-driver": "json-file",
+      "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+      }
+    }
+    EOF
   - systemctl enable --now docker
   - usermod -aG docker ${vm_user}
   - mkdir -p /home/${vm_user}/kittygram

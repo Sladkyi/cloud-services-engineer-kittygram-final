@@ -10,14 +10,18 @@ resource "yandex_compute_instance" "kittygram_vm" {
 
   resources {
     cores         = 2
-    memory        = 2
-    core_fraction = 50
+    memory        = 4
+    core_fraction = 100
+  }
+
+  scheduling_policy {
+    preemptible = false
   }
 
   boot_disk {
     initialize_params {
       image_id = data.yandex_compute_image.ubuntu.id
-      size     = 15
+      size     = 20
       type     = "network-ssd"
     }
   }
@@ -25,11 +29,8 @@ resource "yandex_compute_instance" "kittygram_vm" {
   network_interface {
     subnet_id          = yandex_vpc_subnet.kittygram_subnet.id
     nat                = true
+    nat_ip_address     = yandex_vpc_address.kittygram_external_ip.external_ipv4_address[0].address
     security_group_ids = [yandex_vpc_security_group.kittygram_sg.id]
-  }
-
-  scheduling_policy {
-    preemptible = true
   }
 
   metadata = {

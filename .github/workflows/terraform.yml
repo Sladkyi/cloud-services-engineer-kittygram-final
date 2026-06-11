@@ -12,6 +12,11 @@ on:
           - plan
           - apply
           - destroy
+      recreate_vm:
+        description: 'Recreate VM (re-runs cloud-init with current SSH key)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   terraform:
@@ -46,7 +51,12 @@ jobs:
 
       - name: Terraform Apply
         if: ${{ github.event.inputs.action == 'apply' }}
-        run: terraform apply -auto-approve
+        run: |
+          if [ "${{ github.event.inputs.recreate_vm }}" = "true" ]; then
+            terraform apply -auto-approve -replace=yandex_compute_instance.kittygram_vm
+          else
+            terraform apply -auto-approve
+          fi
 
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
